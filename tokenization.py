@@ -118,6 +118,12 @@ class FullTokenizer(object):
   def convert_tokens_to_ids(self, tokens):
     return convert_tokens_to_ids(self.vocab, tokens)
 
+  def convert_ids_to_tokens(self, ids):
+    tokens = []
+    for idd in ids:
+      idx = self.vocab.values().index(idd)
+      tokens.append(self.vocab.keys()[idx])
+    return tokens
 
 class BasicTokenizer(object):
   """Runs basic tokenization (punctuation splitting, lower casing, etc.)."""

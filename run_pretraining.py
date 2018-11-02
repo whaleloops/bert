@@ -22,6 +22,7 @@ import os
 import modeling
 import optimization
 import tensorflow as tf
+import pickle
 
 flags = tf.flags
 
@@ -58,6 +59,8 @@ flags.DEFINE_integer(
     "Must match data generation.")
 
 flags.DEFINE_bool("do_train", False, "Whether to run training.")
+
+flags.DEFINE_bool("do_predict", False, "Whether to run training.")
 
 flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
 
@@ -190,10 +193,10 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
                     next_sentence_log_probs, next_sentence_labels):
         """Computes the loss and accuracy of the model."""
         masked_lm_log_probs = tf.reshape(masked_lm_log_probs,
-                                         [-1, masked_lm_log_probs.shape[-1]])
+                                         [-1, masked_lm_log_probs.shape[-1]]) #(number of masks, vocab_size)
         masked_lm_predictions = tf.argmax(
             masked_lm_log_probs, axis=-1, output_type=tf.int32)
-        masked_lm_example_loss = tf.reshape(masked_lm_example_loss, [-1])
+        masked_lm_example_loss = tf.reshape(masked_lm_example_loss, [-1]) #(number of masks,)
         masked_lm_ids = tf.reshape(masked_lm_ids, [-1])
         masked_lm_weights = tf.reshape(masked_lm_weights, [-1])
         masked_lm_accuracy = tf.metrics.accuracy(
@@ -230,6 +233,35 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
           loss=total_loss,
           eval_metrics=eval_metrics,
           scaffold_fn=scaffold_fn)
+    elif mode == tf.estimator.ModeKeys.PREDICT:
+
+      q,w = masked_lm_ids.shape
+      masked_lm_log_probss = tf.reshape(masked_lm_log_probs,
+                                         [q,w,-1]) #(batch, number of masks pre batch, vocab_size)
+      masked_lm_predictions = tf.argmax(
+            masked_lm_log_probss, axis=-1, output_type=tf.int32)
+      next_sentence_log_probss = tf.reshape(
+            next_sentence_log_probs, [-1, next_sentence_log_probs.shape[-1]])
+      next_sentence_predictions = tf.argmax(
+            next_sentence_log_probss, axis=-1, output_type=tf.int32)
+
+      predicts = {
+          'input_ids': input_ids,
+          'input_mask': input_mask,
+          'segment_ids': segment_ids,
+          'masked_lm_positions': masked_lm_positions,
+          'masked_lm_ids': masked_lm_ids,
+          'masked_lm_weights': masked_lm_weights,
+          'next_sentence_labels': next_sentence_labels,
+          'masked_lm_predictions': masked_lm_predictions,
+          'masked_lm_log_probs': masked_lm_log_probss,
+          'next_sentence_log_probs': next_sentence_log_probs,
+          'next_sentence_predictions': next_sentence_predictions,
+      }
+      output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+        mode=mode, 
+        predictions=predicts,
+        scaffold_fn=scaffold_fn)
     else:
       raise ValueError("Only TRAIN and EVAL modes are supported: %s" % (mode))
 
@@ -384,10 +416,56 @@ def input_fn_builder(input_files,
             batch_size=batch_size,
             num_parallel_batches=num_cpu_threads,
             drop_remainder=True))
+
     return d
 
   return input_fn
 
+def pred_input_fn_builder(input_files,
+                     max_seq_length,
+                     max_predictions_per_seq,
+                     is_training,
+                     num_cpu_threads=4):
+  """Creates an `input_fn` closure to be passed to TPUEstimator."""
+
+  def input_fn(params):
+    """The actual input function."""
+    batch_size = params["batch_size"]
+
+    name_to_features = {
+        "input_ids":
+            tf.FixedLenFeature([max_seq_length], tf.int64),
+        "input_mask":
+            tf.FixedLenFeature([max_seq_length], tf.int64),
+        "segment_ids":
+            tf.FixedLenFeature([max_seq_length], tf.int64),
+        "masked_lm_positions":
+            tf.FixedLenFeature([max_predictions_per_seq], tf.int64),
+        "masked_lm_ids":
+            tf.FixedLenFeature([max_predictions_per_seq], tf.int64),
+        "masked_lm_weights":
+            tf.FixedLenFeature([max_predictions_per_seq], tf.float32),
+        "next_sentence_labels":
+            tf.FixedLenFeature([1], tf.int64),
+    }
+
+    d = tf.data.TFRecordDataset(input_files)
+    d = d.repeat(1)
+
+    # We must `drop_remainder` on training because the TPU requires fixed
+    # size dimensions. For eval, we assume we are evaluating on the CPU or GPU
+    # and we *don't* want to drop the remainder, otherwise we wont cover
+    # every sample.
+    d = d.apply(
+        tf.contrib.data.map_and_batch(
+            lambda record: _decode_record(record, name_to_features),
+            batch_size=batch_size,
+            num_parallel_batches=num_cpu_threads,
+            drop_remainder=True))
+
+    return d
+
+  return input_fn
 
 def _decode_record(record, name_to_features):
   """Decodes a record to a TensorFlow example."""
@@ -419,8 +497,13 @@ def main(_):
     input_files.extend(tf.gfile.Glob(input_pattern))
 
   tf.logging.info("*** Input Files ***")
+  num_records = 0
   for input_file in input_files:
     tf.logging.info("  %s" % input_file)
+    for fn in input_files:
+      for record in tf.python_io.tf_record_iterator(fn):
+        num_records += 1
+  tf.logging.info ("  total number of records: %d" % num_records)
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
@@ -454,7 +537,10 @@ def main(_):
       model_fn=model_fn,
       config=run_config,
       train_batch_size=FLAGS.train_batch_size,
-      eval_batch_size=FLAGS.eval_batch_size)
+      eval_batch_size=FLAGS.eval_batch_size,
+      predict_batch_size=FLAGS.eval_batch_size)
+
+
 
   if FLAGS.do_train:
     tf.logging.info("***** Running training *****")
@@ -465,6 +551,47 @@ def main(_):
         max_predictions_per_seq=FLAGS.max_predictions_per_seq,
         is_training=True)
     estimator.train(input_fn=train_input_fn, max_steps=FLAGS.num_train_steps)
+
+  if FLAGS.do_predict:
+    tf.logging.info("***** Running prediction *****")
+    tf.logging.info("  Batch size = %d", FLAGS.eval_batch_size)
+
+    eval_input_fn = pred_input_fn_builder(
+        input_files=input_files,
+        max_seq_length=FLAGS.max_seq_length,
+        max_predictions_per_seq=FLAGS.max_predictions_per_seq,
+        is_training=False)
+
+     # 'input_ids': input_ids,
+     # 'input_mask': input_mask,
+     # 'segment_ids': segment_ids,
+     # 'masked_lm_positions': masked_lm_positions,
+     # 'masked_lm_ids': masked_lm_ids,
+     # 'masked_lm_weights': masked_lm_weights,
+     # 'next_sentence_labels': next_sentence_labels,
+     # 'masked_lm_predictions': masked_lm_predictions,
+     # 'masked_lm_log_probs': masked_lm_log_probss,
+     # 'next_sentence_log_probs': next_sentence_log_probs,
+     # 'next_sentence_predictions': next_sentence_predictions,
+
+    with open('tokenizer.pkl', 'rb') as f:
+      tokenizer = pickle.load(f)
+
+    output_eval_file = os.path.join(FLAGS.output_dir, "pred_results.txt")
+    with tf.gfile.GFile(output_eval_file, "w") as writer:
+      for item in estimator.predict(input_fn=eval_input_fn):
+        input_tokens = tokenizer.convert_ids_to_tokens(item['input_ids'])
+        pred_tokens = tokenizer.convert_ids_to_tokens(item['masked_lm_predictions'])
+        true_tokens = tokenizer.convert_ids_to_tokens(item['masked_lm_ids'])
+        
+        mask_count = 0
+        for i in range(len(input_tokens)):
+          if i == item['masked_lm_positions'][mask_count]:
+            writer.write("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], item['masked_lm_weights'][mask_count]))
+            mask_count += 1
+          else:
+            writer.write("%s " % (input_tokens[i]))
+        writer.write("\n")
 
   if FLAGS.do_eval:
     tf.logging.info("***** Running evaluation *****")
@@ -485,6 +612,9 @@ def main(_):
       for key in sorted(result.keys()):
         tf.logging.info("  %s = %s", key, str(result[key]))
         writer.write("%s = %s\n" % (key, str(result[key])))
+
+
+
 
 
 if __name__ == "__main__":

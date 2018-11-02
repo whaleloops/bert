@@ -430,6 +430,10 @@ def main(_):
   for output_file in output_files:
     tf.logging.info("  %s", output_file)
 
+  import pickle
+  with open('tokenizer.pkl', 'wb') as f:
+    pickle.dump(tokenizer, f, pickle.HIGHEST_PROTOCOL)
+
   write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
                                   FLAGS.max_predictions_per_seq, output_files)
 
