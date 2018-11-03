@@ -592,7 +592,7 @@ def main(_):
           else:
             writer.write("%s " % (input_tokens[i]))
         writer.write("\n")
-        writer.write("true: %d, pred: %d\n" % (item['next_sentence_labels'], item['next_sentence_predictions'])
+        writer.write("true: %d, pred: %d\n" % (item['next_sentence_labels'], item['next_sentence_predictions']))
 
   if FLAGS.do_eval:
     tf.logging.info("***** Running evaluation *****")

@@ -208,10 +208,10 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   instances = []
   for _ in range(dupe_factor):
     for document_index in range(len(all_documents)):
-      instances.extend(
-          create_instances_from_document(
+      tmp = create_instances_from_document(
               all_documents, document_index, max_seq_length, short_seq_prob,
-              masked_lm_prob, max_predictions_per_seq, vocab_words, rng))
+              masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
+      instances.extend(tmp)
 
   rng.shuffle(instances)
   return instances
