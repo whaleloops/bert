@@ -217,7 +217,7 @@ class BertModel(object):
             do_return_all_layers=True)
 
       # self.sequence_output = self.all_encoder_layers[-1]
-      self.sequence_output = self.all_encoder_layers[-3] #TODO
+      self.sequence_output = self.all_encoder_layers[-1] #TODO
       # The "pooler" converts the encoded sequence tensor of shape
       # [batch_size, seq_length, hidden_size] to a tensor of shape
       # [batch_size, hidden_size]. This is necessary for segment-level

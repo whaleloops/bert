@@ -61,6 +61,9 @@ flags.DEFINE_float(
     "Probability of creating sequences which are shorter than the "
     "maximum length.")
 
+flags.DEFINE_bool(
+    "mask_given", False,
+    "Mask given for not")
 
 class TrainingInstance(object):
   """A single training instance (sentence pair)."""
@@ -111,9 +114,12 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
       input_mask.append(0)
       segment_ids.append(0)
 
+    print (instance.tokens)
+    print (instance.segment_ids)
+
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
-    assert len(segment_ids) == max_seq_length
+    assert len(segment_ids) == max_seq_length, "%d != %d"%(len(segment_ids),max_seq_length) 
 
     masked_lm_positions = list(instance.masked_lm_positions)
     masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)
@@ -175,7 +181,7 @@ def create_float_feature(values):
 
 def create_training_instances(input_files, tokenizer, max_seq_length,
                               dupe_factor, short_seq_prob, masked_lm_prob,
-                              max_predictions_per_seq, rng):
+                              max_predictions_per_seq, rng, mask_given=False):
   """Create `TrainingInstance`s from raw text."""
   all_documents = [[]]
 
@@ -210,7 +216,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
     for document_index in range(len(all_documents)):
       tmp = create_instances_from_document(
               all_documents, document_index, max_seq_length, short_seq_prob,
-              masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
+              masked_lm_prob, max_predictions_per_seq, vocab_words, rng, mask_given=mask_given)
       instances.extend(tmp)
 
   rng.shuffle(instances)
@@ -219,7 +225,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
 
 def create_instances_from_document(
     all_documents, document_index, max_seq_length, short_seq_prob,
-    masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
+    masked_lm_prob, max_predictions_per_seq, vocab_words, rng, mask_given=False):
   """Creates `TrainingInstance`s for a single document."""
   document = all_documents[document_index]
 
@@ -315,9 +321,13 @@ def create_instances_from_document(
         tokens.append("[SEP]")
         segment_ids.append(1)
 
-        (tokens, masked_lm_positions,
-         masked_lm_labels) = create_masked_lm_predictions(
-             tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
+
+        if mask_given:
+          (tokens, masked_lm_positions, masked_lm_labels, segment_ids) = create_masked_lm_predictions_based_given(
+             tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, segment_ids)
+        else:
+          (tokens, masked_lm_positions, masked_lm_labels) = create_masked_lm_predictions(
+             tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)        
         instance = TrainingInstance(
             tokens=tokens,
             segment_ids=segment_ids,
@@ -384,7 +394,49 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
     masked_lm_positions.append(p.index)
     masked_lm_labels.append(p.label)
 
+  # print (tokens)
+  # print (output_tokens)
+  # print (masked_lm_positions)
+  # print (masked_lm_labels)
+  # abc
+
   return (output_tokens, masked_lm_positions, masked_lm_labels)
+
+
+def create_masked_lm_predictions_based_given(tokens, masked_lm_prob,
+                                 max_predictions_per_seq, vocab_words, segment_ids):
+  """Creates the predictions for the masked LM objective."""
+
+  tokens_len = len(tokens)
+
+  output_tokens = []
+  masked_lm_positions = []
+  masked_lm_labels = []
+  segment_ids_new = []
+  i=0
+  idx=0
+  while i < tokens_len:
+    tok = tokens[i]
+    if tok==u'\u529b':
+      masked_token = "[MASK]"
+      output_tokens.append(masked_token)
+      masked_lm_positions.append(idx)
+      i+=1
+      masked_lm_labels.append(tokens[i])
+      segment_ids_new.append(segment_ids[i])
+    else:
+      output_tokens.append(tok)
+      segment_ids_new.append(segment_ids[i])
+      idx+=1
+    i+=1
+
+  # print (tokens)
+  # print (output_tokens)
+  # print (masked_lm_positions)
+  # print (masked_lm_labels)
+  # abc
+
+  return (output_tokens, masked_lm_positions, masked_lm_labels, segment_ids_new)
 
 
 def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
@@ -423,7 +475,7 @@ def main(_):
   instances = create_training_instances(
       input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
       FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
-      rng)
+      rng, mask_given=FLAGS.mask_given)
 
   output_files = FLAGS.output_file.split(",")
   tf.logging.info("*** Writing to output files ***")
