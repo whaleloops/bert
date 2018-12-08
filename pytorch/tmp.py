@@ -4,6 +4,8 @@ import collections
 import random
 
 import modeling, tokenization
+
+import numpy as np
 import torch
 from torch.utils.data import TensorDataset, DataLoader, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
@@ -52,7 +54,7 @@ def create_masked_lm_predictions_based_given(tokens, max_predictions_per_seq, se
   num_masks = 0
   while i < tokens_len:
     tok = tokens[i]
-    if tok==u'\u529b':
+    if tok==u'01':
       masked_token = "[MASK]"
       output_tokens.append(masked_token)
       masked_lm_positions.append(idx)
@@ -113,16 +115,18 @@ def generate_example_given_instance(instance, tokenizer, max_seq_length,
   features["masked_lm_ids"] = masked_lm_ids
   features["masked_lm_weights"] = masked_lm_weights
   features["next_sentence_labels"] = [next_sentence_label]
+  features['masked_lm_labels'] = np.ones_like(input_ids)*-1
+  features['masked_lm_labels'][masked_lm_positions] = masked_lm_ids
 
   return features
 
 
-SENT_A = "Indeed, it was recorded in Blazing Star that a fortunate early 力 riser had once picked up on the \
+SENT_A = "Indeed, it was recorded in Blazing Star that a fortunate early 01 riser had once picked up on the \
 highway a solid chunk of gold quartz which the rain had freed from its incumbering soil, and washed into \
 immediate and glittering popularity."
 SENT_B =  "Possibly this may have been the reason why early risers in that locality, during the rainy \
 season, adopted a thoughtful habit of body, and seldom lifted their eyes to the rifted or \
-india-ink washed skies 力 above them."
+india-ink washed skies 01 above them."
 IS_RANDOM_NEXT = True
 
 VOCAB_FILE = '../../uncased_L-12_H-768_A-12/vocab.txt'
@@ -138,7 +142,8 @@ NUM_WARMUP_STEPS = 10
 USE_TPU = False
 BATCH_SIZE = 1
 
-tokenizer = tokenization.FullTokenizer(
+
+tokenizer = tokenization.BertTokenizer(
       vocab_file=VOCAB_FILE, do_lower_case=DO_LOWER_CASE)
 #tokenize
 line = tokenization.convert_to_unicode(SENT_A)
@@ -196,9 +201,9 @@ model.to(device)
 print ('loaded model')
 
 #TODO resolve features
-all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-all_input_type_ids = torch.tensor([f.input_type_ids for f in features], dtype=torch.long)
+all_input_ids = torch.tensor([features['input_ids']], dtype=torch.long)
+all_input_mask = torch.tensor([features['input_mask']], dtype=torch.long)
+all_input_type_ids = torch.tensor([features['segment_ids']], dtype=torch.long)
 all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
 
 eval_data = TensorDataset(all_input_ids, all_input_mask, all_input_type_ids, all_example_index)
@@ -210,22 +215,38 @@ model.eval()
 
 
 for input_ids, input_mask, input_type_ids, example_indices in eval_dataloader:
-    print(input_ids)
-    print(input_mask)
-    print(example_indices)
+    # print(input_ids)
+    # print(input_mask)
+    # print(example_indices)
     input_ids = input_ids.to(device)
     input_mask = input_mask.to(device)
 
     masked_lm_logits_scores, seq_relationship_logits = model(input_ids, token_type_ids=input_type_ids, attention_mask=input_mask)
-
     print (masked_lm_logits_scores.shape)
-    print (seq_relationship_logits.shape)
-      # q,w = masked_lm_ids.shape
-      # masked_lm_log_probss = tf.reshape(masked_lm_logits_scores,
-      #                                    [q,w,-1]) #(batch, number of masks pre batch, vocab_size)
-      # masked_lm_predictions = tf.argmax(
-      #       masked_lm_log_probss, axis=-1, output_type=tf.int32)
-      # next_sentence_log_probss = tf.reshape(
-      #       next_sentence_log_probs, [-1, next_sentence_log_probs.shape[-1]])
-      # next_sentence_predictions = tf.argmax(
-      #       next_sentence_log_probss, axis=-1, output_type=tf.int32)
+    print (seq_relationship_logits)
+
+    masked_lm_predictions = torch.nn.functional.log_softmax(masked_lm_logits_scores[:,features['masked_lm_positions'],:], dim=-1)
+    masked_lm_predictions = torch.argmax(masked_lm_predictions, dim=-1)
+    next_sentence_log_probs = torch.nn.functional.log_softmax(seq_relationship_logits, dim=-1)
+    next_sentence_predictions = torch.argmax(next_sentence_log_probs, dim=-1)
+    print (masked_lm_predictions)
+    print (next_sentence_log_probs)
+    print (next_sentence_predictions)
+
+
+    input_tokens = tokenizer.convert_ids_to_tokens(features['input_ids'])
+    pred_tokens = tokenizer.convert_ids_to_tokens(masked_lm_predictions.detach().numpy()[0].astype(int))
+    true_tokens = tokenizer.convert_ids_to_tokens(features['masked_lm_ids'])
+    mask_count = 0
+    print (features['masked_lm_positions'])
+    for i in range(len(input_tokens)):
+        if i == features['masked_lm_positions'][mask_count]:
+            # print("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], features['masked_lm_weights'][mask_count])),
+            print("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], features['masked_lm_weights'][mask_count]),end='')
+            mask_count += 1
+        else:
+            # print("%s " % (input_tokens[i])),
+            print("%s " % (input_tokens[i]),end='')
+    print("\n")
+    print("true: %d, pred: %d\n" % (features['next_sentence_labels'][0], next_sentence_predictions.detach().numpy()[0]))
+    print(np.exp(next_sentence_log_probs.detach().numpy()))

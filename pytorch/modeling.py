@@ -683,8 +683,7 @@ class BertForPreTraining(PreTrainedBertModel):
             loss_fct = CrossEntropyLoss(ignore_index=-1)
             masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), masked_lm_labels.view(-1))
             next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
-            total_loss = masked_lm_loss + next_sentence_loss
-            return total_loss
+            return masked_lm_loss, next_sentence_loss, prediction_scores, seq_relationship_score
         else:
             return prediction_scores, seq_relationship_score
 

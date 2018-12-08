@@ -353,15 +353,15 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
     return model_fn
 
 
-# SENT_A = "Indeed, it was recorded in Blazing Star that a fortunate early 力 riser had once picked up on the \
-# highway a solid chunk of gold quartz which the rain had freed from its incumbering soil, and washed into \
-# immediate and glittering popularity."
-# SENT_B =  "Possibly this may have been the reason why early risers in that locality, during the rainy \
-# season, adopted a thoughtful habit of body, and seldom lifted their eyes to the rifted or \
-# india-ink washed skies 力 above them."
-SENT_A = "William Shakespeare was an English poet, playwright and actor, widely regarded as the \
-greatest writer in the English language and the world's greatest dramatist."
-SENT_B =  "He is often called England's national poet and the Bard of Avon"
+SENT_A = "Indeed, it was recorded in Blazing Star that a fortunate early 力 riser had once picked up on the \
+highway a solid chunk of gold quartz which the rain had freed from its incumbering soil, and washed into \
+immediate and glittering popularity."
+SENT_B =  "Possibly this may have been the reason why early risers in that locality, during the rainy \
+season, adopted a thoughtful habit of body, and seldom lifted their eyes to the rifted or \
+india-ink washed skies 力 above them."
+# SENT_A = "William Shakespeare was an English poet, playwright and actor, widely regarded as the \
+# greatest writer in the English language and the world's greatest dramatist."
+# SENT_B =  "He is often called England's national poet and the Bard of Avon"
 IS_RANDOM_NEXT = True
 
 
@@ -382,6 +382,7 @@ BATCH_SIZE = 1
 
 tokenizer = tokenization.FullTokenizer(
       vocab_file=VOCAB_FILE, do_lower_case=DO_LOWER_CASE)
+
 #tokenize
 line = tokenization.convert_to_unicode(SENT_A)
 line = line.strip()
