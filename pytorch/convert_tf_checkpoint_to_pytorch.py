@@ -27,6 +27,11 @@ import numpy as np
 
 from modeling import BertConfig, BertForPreTraining
 
+
+# def fullmatch(regex, string, flags=0):
+#     """Emulate python-3.4 re.fullmatch()."""
+#     return re.match("(?:" + regex + r")\Z", string, flags=flags)
+
 def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
     config_path = os.path.abspath(bert_config_file)
     tf_path = os.path.abspath(tf_checkpoint_path)
@@ -48,11 +53,12 @@ def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytor
     #   pickle.dump(arrays, fp)
     
     import pickle
-
     with open("tmp_names", "rb") as fp:   # Unpickling
-      names = pickle.load(fp, encoding='iso-8859-1')
+      # names = pickle.load(fp, encoding='iso-8859-1')
+      names = pickle.load(fp)
     with open("tmp_arrays", "rb") as fp:   # Unpickling
-      arrays = pickle.load(fp, encoding='iso-8859-1')
+      # arrays = pickle.load(fp, encoding='iso-8859-1')
+      arrays = pickle.load(fp)
 
     # Initialise PyTorch model
     config = BertConfig.from_json_file(bert_config_file)

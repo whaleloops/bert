@@ -470,8 +470,6 @@ class PreTrainedBertModel(nn.Module):
             archive_file = pretrained_model_name
         # redirect to the cache, if necessary
         try:
-            print (archive_file)
-            print (cache_dir)
             # resolved_archive_file = cached_path(archive_file, cache_dir=cache_dir)
             resolved_archive_file = archive_file #TODO
         except FileNotFoundError:

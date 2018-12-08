@@ -21,7 +21,6 @@ from __future__ import print_function
 import collections
 import unicodedata
 import six
-import tensorflow as tf
 
 
 def convert_to_unicode(text):
@@ -68,19 +67,18 @@ def printable_text(text):
 
 
 def load_vocab(vocab_file):
-  """Loads a vocabulary file into a dictionary."""
-  vocab = collections.OrderedDict()
-  index = 0
-  with tf.gfile.GFile(vocab_file, "r") as reader:
-    while True:
-      token = convert_to_unicode(reader.readline())
-      if not token:
-        break
-      token = token.strip()
-      vocab[token] = index
-      index += 1
-  return vocab
-
+    """Loads a vocabulary file into a dictionary."""
+    vocab = collections.OrderedDict()
+    index = 0
+    with open(vocab_file, "r") as reader:
+        while True:
+            token = convert_to_unicode(reader.readline())
+            if not token:
+                break
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    return vocab
 
 def convert_tokens_to_ids(vocab, tokens):
   """Converts a sequence of tokens into ids using the vocab."""
