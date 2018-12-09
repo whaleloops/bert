@@ -605,7 +605,7 @@ def main(_):
         is_training=False)
 
     result = estimator.evaluate(
-        input_fn=eval_input_fn, steps=FLAGS.max_eval_steps)
+        input_fn=eval_input_fn, steps=100)
 
     output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
     with tf.gfile.GFile(output_eval_file, "w") as writer:

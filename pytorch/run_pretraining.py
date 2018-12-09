@@ -5,7 +5,6 @@ import random
 import pickle
 
 import modeling, tokenization
-from create_pretraining_data import create_training_instances, create_multi_features_from_instances
 
 import numpy as np
 import torch
@@ -84,26 +83,31 @@ if __name__ == "__main__":
   all_input_type_ids = torch.tensor([f['segment_ids'] for f in features], dtype=torch.long)
   all_masked_lm_labels = torch.tensor([f['masked_lm_labels'] for f in features], dtype=torch.long)
   all_next_sentence_labels = torch.tensor([f['next_sentence_labels'] for f in features], dtype=torch.long)
+  all_masked_lm_ids = torch.tensor([f['masked_lm_ids'] for f in features], dtype=torch.long)
+  all_masked_lm_weights = torch.tensor([f['masked_lm_weights'] for f in features], dtype=torch.long)
+  all_masked_lm_positions = torch.tensor([f['masked_lm_positions'] for f in features], dtype=torch.long)
   all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
 
-  eval_data = TensorDataset(all_input_ids, all_input_mask, all_input_type_ids, all_masked_lm_labels, all_next_sentence_labels, all_example_index)
+  eval_data = TensorDataset(all_input_ids, all_input_mask, all_input_type_ids, all_masked_lm_labels, 
+    all_next_sentence_labels, all_masked_lm_ids, all_masked_lm_weights, all_masked_lm_positions, 
+    all_example_index)
   eval_sampler = SequentialSampler(eval_data)
-  eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=33)
+  eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=30)
   model.eval()
 
-  for input_ids, input_mask, input_type_ids, masked_lm_labels, next_sentence_label, example_indices in eval_dataloader:
+  for input_ids, input_mask, input_type_ids, masked_lm_labels, next_sentence_labels, masked_lm_ids, masked_lm_weights, masked_lm_positions, example_indices in eval_dataloader:
     masked_lm_loss, next_sentence_loss, prediction_scores, seq_relationship_score = model(input_ids, token_type_ids=input_type_ids, attention_mask=input_mask,
-                                               masked_lm_labels=masked_lm_labels , next_sentence_label=next_sentence_label)
+                                               masked_lm_labels=masked_lm_labels , next_sentence_label=next_sentence_labels)
     # print (masked_lm_loss)
     # print (next_sentence_loss)
     masked_lm_log_probs =  torch.nn.functional.log_softmax(prediction_scores, dim=-1).detach().numpy()
     next_sentence_log_probs = torch.nn.functional.log_softmax(seq_relationship_score, dim=-1).detach().numpy()
     masked_lm_example_loss = masked_lm_loss.detach().numpy()
     next_sentence_example_loss = next_sentence_loss.detach().numpy()
-    masked_lm_ids        = np.array([f['masked_lm_ids'] for f in features])
-    next_sentence_labels = np.array([f['next_sentence_labels'] for f in features])
-    masked_lm_weights    = np.array([f['masked_lm_weights'] for f in features])
-    masked_lm_positions  = np.array([f['masked_lm_positions'] for f in features])
+    masked_lm_ids        = masked_lm_ids.detach().numpy()
+    next_sentence_labels = next_sentence_labels.detach().numpy()
+    masked_lm_weights    = masked_lm_weights.detach().numpy()
+    masked_lm_positions  = masked_lm_positions.detach().numpy()
 
     evals = metric_fn(masked_lm_example_loss, masked_lm_log_probs, masked_lm_ids,
               masked_lm_weights, masked_lm_positions, next_sentence_example_loss,

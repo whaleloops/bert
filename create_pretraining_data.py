@@ -1,69 +1,15 @@
 # coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Create masked LM/next sentence masked_lm TF examples for BERT."""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import collections
 import random
+import numpy as np
 
 import tokenization
 import tensorflow as tf
 
-flags = tf.flags
-
-FLAGS = flags.FLAGS
-
-flags.DEFINE_string("input_file", None,
-                    "Input raw text file (or comma-separated list of files).")
-
-flags.DEFINE_string(
-    "output_file", None,
-    "Output TF example file (or comma-separated list of files).")
-
-flags.DEFINE_string("vocab_file", None,
-                    "The vocabulary file that the BERT model was trained on.")
-
-flags.DEFINE_bool(
-    "do_lower_case", True,
-    "Whether to lower case the input text. Should be True for uncased "
-    "models and False for cased models.")
-
-flags.DEFINE_integer("max_seq_length", 128, "Maximum sequence length.")
-
-flags.DEFINE_integer("max_predictions_per_seq", 20,
-                     "Maximum number of masked LM predictions per sequence.")
-
-flags.DEFINE_integer("random_seed", 12345, "Random seed for data generation.")
-
-flags.DEFINE_integer(
-    "dupe_factor", 10,
-    "Number of times to duplicate the input data (with different masks).")
-
-flags.DEFINE_float("masked_lm_prob", 0.15, "Masked LM probability.")
-
-flags.DEFINE_float(
-    "short_seq_prob", 0.1,
-    "Probability of creating sequences which are shorter than the "
-    "maximum length.")
-
-flags.DEFINE_bool(
-    "mask_given", False,
-    "Mask given for not")
 
 class TrainingInstance(object):
   """A single training instance (sentence pair)."""
@@ -93,16 +39,11 @@ class TrainingInstance(object):
     return self.__str__()
 
 
-def write_instance_to_example_files(instances, tokenizer, max_seq_length,
+def create_multi_features_from_instances(instances, tokenizer, max_seq_length,
                                     max_predictions_per_seq, output_files):
-  """Create TF example files from `TrainingInstance`s."""
-  writers = []
-  for output_file in output_files:
-    writers.append(tf.python_io.TFRecordWriter(output_file))
-
-  writer_index = 0
 
   total_written = 0
+  features = []
   for (inst_index, instance) in enumerate(instances):
     input_ids = tokenizer.convert_tokens_to_ids(instance.tokens)
     input_mask = [1] * len(input_ids)
@@ -114,8 +55,8 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
       input_mask.append(0)
       segment_ids.append(0)
 
-    print (instance.tokens)
-    print (instance.segment_ids)
+    # print (instance.tokens)
+    # print (instance.segment_ids)
 
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
@@ -132,52 +73,22 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
 
     next_sentence_label = 1 if instance.is_random_next else 0
 
-    features = collections.OrderedDict()
-    features["input_ids"] = create_int_feature(input_ids)
-    features["input_mask"] = create_int_feature(input_mask)
-    features["segment_ids"] = create_int_feature(segment_ids)
-    features["masked_lm_positions"] = create_int_feature(masked_lm_positions)
-    features["masked_lm_ids"] = create_int_feature(masked_lm_ids)
-    features["masked_lm_weights"] = create_float_feature(masked_lm_weights)
-    features["next_sentence_labels"] = create_int_feature([next_sentence_label])
-
-    tf_example = tf.train.Example(features=tf.train.Features(feature=features))
-
-    writers[writer_index].write(tf_example.SerializeToString())
-    writer_index = (writer_index + 1) % len(writers)
+    feature = collections.OrderedDict()
+    feature["input_ids"] = input_ids
+    feature["input_mask"] = input_mask
+    feature["segment_ids"] = segment_ids
+    feature["masked_lm_positions"] = masked_lm_positions
+    feature["masked_lm_ids"] = masked_lm_ids
+    feature["masked_lm_weights"] = masked_lm_weights
+    feature["next_sentence_labels"] = [next_sentence_label]
+    feature['masked_lm_labels'] = np.ones_like(input_ids)*-1
+    feature['masked_lm_labels'][masked_lm_positions] = masked_lm_ids
+    features.append(feature)
 
     total_written += 1
 
-    if inst_index < 20:
-      tf.logging.info("*** Example ***")
-      tf.logging.info("tokens: %s" % " ".join(
-          [tokenization.printable_text(x) for x in instance.tokens]))
-
-      for feature_name in features.keys():
-        feature = features[feature_name]
-        values = []
-        if feature.int64_list.value:
-          values = feature.int64_list.value
-        elif feature.float_list.value:
-          values = feature.float_list.value
-        tf.logging.info(
-            "%s: %s" % (feature_name, " ".join([str(x) for x in values])))
-
-  for writer in writers:
-    writer.close()
-
-  tf.logging.info("Wrote %d total instances", total_written)
-
-
-def create_int_feature(values):
-  feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
-  return feature
-
-
-def create_float_feature(values):
-  feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
-  return feature
-
+  print ("Wrote %d total instances pt" % total_written)
+  return features
 
 def create_training_instances(input_files, tokenizer, max_seq_length,
                               dupe_factor, short_seq_prob, masked_lm_prob,
@@ -192,7 +103,8 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   # (2) Blank lines between documents. Document boundaries are needed so
   # that the "next sentence prediction" task doesn't span between documents.
   for input_file in input_files:
-    with tf.gfile.GFile(input_file, "r") as reader:
+    # with open(input_file, "r", encoding="iso-8859-15") as reader:
+    with open(input_file, "r") as reader:
       while True:
         line = tokenization.convert_to_unicode(reader.readline())
         if not line:
@@ -415,15 +327,17 @@ def create_masked_lm_predictions_based_given(tokens, masked_lm_prob,
   segment_ids_new = []
   i=0
   idx=0
+  num_masks = 0
   while i < tokens_len:
     tok = tokens[i]
-    if tok==u'\u529b':
+    if tok==u'01':
       masked_token = "[MASK]"
       output_tokens.append(masked_token)
       masked_lm_positions.append(idx)
       i+=1
       masked_lm_labels.append(tokens[i])
       segment_ids_new.append(segment_ids[i])
+      idx+=1
     else:
       output_tokens.append(tok)
       segment_ids_new.append(segment_ids[i])
@@ -456,42 +370,132 @@ def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
     else:
       trunc_tokens.pop()
 
+def create_int_feature(values):
+  feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
+  return feature
 
-def main(_):
-  tf.logging.set_verbosity(tf.logging.INFO)
 
-  tokenizer = tokenization.FullTokenizer(
-      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
+def create_float_feature(values):
+  feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
+  return feature
 
-  input_files = []
-  for input_pattern in FLAGS.input_file.split(","):
-    input_files.extend(tf.gfile.Glob(input_pattern))
 
-  tf.logging.info("*** Reading from input files ***")
-  for input_file in input_files:
-    tf.logging.info("  %s", input_file)
-
-  rng = random.Random(FLAGS.random_seed)
-  instances = create_training_instances(
-      input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
-      FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
-      rng, mask_given=FLAGS.mask_given)
-
-  output_files = FLAGS.output_file.split(",")
-  tf.logging.info("*** Writing to output files ***")
+def write_instance_to_example_files(instances, tokenizer, max_seq_length,
+                                    max_predictions_per_seq, output_files):
+  """Create TF example files from `TrainingInstance`s."""
+  writers = []
   for output_file in output_files:
-    tf.logging.info("  %s", output_file)
+    writers.append(tf.python_io.TFRecordWriter(output_file))
+
+  writer_index = 0
+
+  total_written = 0
+  for (inst_index, instance) in enumerate(instances):
+    input_ids = tokenizer.convert_tokens_to_ids(instance.tokens)
+    input_mask = [1] * len(input_ids)
+    segment_ids = list(instance.segment_ids)
+    assert len(input_ids) <= max_seq_length
+
+    while len(input_ids) < max_seq_length:
+      input_ids.append(0)
+      input_mask.append(0)
+      segment_ids.append(0)
+
+    # print (instance.tokens)
+    # print (instance.segment_ids)
+
+    assert len(input_ids) == max_seq_length
+    assert len(input_mask) == max_seq_length
+    assert len(segment_ids) == max_seq_length, "%d != %d"%(len(segment_ids),max_seq_length) 
+
+    masked_lm_positions = list(instance.masked_lm_positions)
+    masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)
+    masked_lm_weights = [1.0] * len(masked_lm_ids)
+
+    while len(masked_lm_positions) < max_predictions_per_seq:
+      masked_lm_positions.append(0)
+      masked_lm_ids.append(0)
+      masked_lm_weights.append(0.0)
+
+    next_sentence_label = 1 if instance.is_random_next else 0
+
+    features = collections.OrderedDict()
+    features["input_ids"] = create_int_feature(input_ids)
+    features["input_mask"] = create_int_feature(input_mask)
+    features["segment_ids"] = create_int_feature(segment_ids)
+    features["masked_lm_positions"] = create_int_feature(masked_lm_positions)
+    features["masked_lm_ids"] = create_int_feature(masked_lm_ids)
+    features["masked_lm_weights"] = create_float_feature(masked_lm_weights)
+    features["next_sentence_labels"] = create_int_feature([next_sentence_label])
+
+    tf_example = tf.train.Example(features=tf.train.Features(feature=features))
+
+    writers[writer_index].write(tf_example.SerializeToString())
+    writer_index = (writer_index + 1) % len(writers)
+
+    total_written += 1
+
+    # if inst_index < 20:
+    #   tf.logging.info("*** Example ***")
+    #   tf.logging.info("tokens: %s" % " ".join(
+    #       [tokenization.printable_text(x) for x in instance.tokens]))
+
+    #   for feature_name in features.keys():
+    #     feature = features[feature_name]
+    #     values = []
+    #     if feature.int64_list.value:
+    #       values = feature.int64_list.value
+    #     elif feature.float_list.value:
+    #       values = feature.float_list.value
+    #     tf.logging.info(
+    #         "%s: %s" % (feature_name, " ".join([str(x) for x in values])))
+
+  for writer in writers:
+    writer.close()
+
+  print ("Wrote %d total instances tf" % total_written)
+
+def main():
+
+  tokenizer = tokenization.BertTokenizer(
+        vocab_file=VOCAB_FILE, do_lower_case=DO_LOWER_CASE)
+
+  input_files = [INPUT_FILE]
+
+  rng = random.Random(RANDOM_SEED)
+  instances = create_training_instances(
+      input_files, tokenizer, MAX_SEQ_LENGTH, DUPE_FACTOR,
+      SHORT_SEQ_PROB, MASKED_LM_PROB, MAX_PREDICTIONS_PER_SEQ,
+      rng, mask_given=MASK_GIVEN)
 
   import pickle
-  with open('tokenizer.pkl', 'wb') as f:
+  with open('pytorch/tokenizer.pkl', 'wb') as f:
     pickle.dump(tokenizer, f, pickle.HIGHEST_PROTOCOL)
 
-  write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
-                                  FLAGS.max_predictions_per_seq, output_files)
+  features = create_multi_features_from_instances(instances, tokenizer, MAX_SEQ_LENGTH,
+                                  MAX_PREDICTIONS_PER_SEQ, 'output_files')
+
+  with open('pytorch/features.pkl', 'wb') as f:
+    pickle.dump(features, f, pickle.HIGHEST_PROTOCOL)
+
+  write_instance_to_example_files(instances, tokenizer, MAX_SEQ_LENGTH,
+                                    MAX_PREDICTIONS_PER_SEQ, output_files)
 
 
 if __name__ == "__main__":
-  flags.mark_flag_as_required("input_file")
-  flags.mark_flag_as_required("output_file")
-  flags.mark_flag_as_required("vocab_file")
-  tf.app.run()
+  # INPUT_FILE= './test_txt.txt'
+  INPUT_FILE= './sample_text.txt'
+  VOCAB_FILE = '../uncased_L-12_H-768_A-12/vocab.txt'
+  output_files = ['../tmp/tf_examples.tfrecord']
+
+  RANDOM_SEED = 12345
+  MAX_PREDICTIONS_PER_SEQ = 20
+  MAX_SEQ_LENGTH = 128
+  DO_LOWER_CASE = True
+
+  DUPE_FACTOR=5
+  SHORT_SEQ_PROB=0.1
+  MASKED_LM_PROB=0.15
+  MASK_GIVEN=False
+
+  main()

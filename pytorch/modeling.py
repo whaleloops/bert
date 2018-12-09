@@ -26,6 +26,7 @@ import logging
 import tarfile
 import tempfile
 import shutil
+import six
 
 import torch
 from torch import nn
@@ -281,8 +282,12 @@ class BertIntermediate(nn.Module):
     def __init__(self, config):
         super(BertIntermediate, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.intermediate_act_fn = ACT2FN[config.hidden_act] \
-            if isinstance(config.hidden_act, str) else config.hidden_act
+        if six.PY3:
+            self.intermediate_act_fn = ACT2FN[config.hidden_act] \
+                if isinstance(config.hidden_act, str) else config.hidden_act
+        else:
+            self.intermediate_act_fn = ACT2FN[config.hidden_act] \
+                if isinstance(config.hidden_act, unicode) else config.hidden_act
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -354,8 +359,12 @@ class BertPredictionHeadTransform(nn.Module):
     def __init__(self, config):
         super(BertPredictionHeadTransform, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.transform_act_fn = ACT2FN[config.hidden_act] \
-            if isinstance(config.hidden_act, str) else config.hidden_act
+        if six.PY3:
+            self.transform_act_fn = ACT2FN[config.hidden_act] \
+                if isinstance(config.hidden_act, str) else config.hidden_act
+        else:
+            self.transform_act_fn = ACT2FN[config.hidden_act] \
+                if isinstance(config.hidden_act, unicode) else config.hidden_act
         self.LayerNorm = BertLayerNorm(config)
 
     def forward(self, hidden_states):

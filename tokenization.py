@@ -21,7 +21,7 @@ from __future__ import print_function
 import collections
 import unicodedata
 import six
-import tensorflow as tf
+import os
 
 
 def convert_to_unicode(text):
@@ -68,20 +68,19 @@ def printable_text(text):
 
 
 def load_vocab(vocab_file):
-  """Loads a vocabulary file into a dictionary."""
-  vocab = collections.OrderedDict()
-  index = 0
-  with tf.gfile.GFile(vocab_file, "r") as reader:
-  # with open(vocab_file, "r", encoding="iso-8859-15") as reader:
-    while True:
-      token = convert_to_unicode(reader.readline())
-      if not token:
-        break
-      token = token.strip()
-      vocab[token] = index
-      index += 1
-  return vocab
-
+    """Loads a vocabulary file into a dictionary."""
+    vocab = collections.OrderedDict()
+    index = 0
+    # with open(vocab_file, "r", encoding="iso-8859-15") as reader:
+    with open(vocab_file, "r") as reader:
+        while True:
+            token = convert_to_unicode(reader.readline())
+            if not token:
+                break
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    return vocab
 
 def convert_tokens_to_ids(vocab, tokens):
   """Converts a sequence of tokens into ids using the vocab."""
@@ -98,6 +97,42 @@ def whitespace_tokenize(text):
     return []
   tokens = text.split()
   return tokens
+
+
+class BertTokenizer(object):
+    """Runs end-to-end tokenization: punctuation splitting + wordpiece"""
+    def __init__(self, vocab_file, do_lower_case=True):
+        if not os.path.isfile(vocab_file):
+            raise ValueError(
+                "Can't find a vocabulary file at path '{}'. To load the vocabulary from a Google pretrained "
+                "model use `tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file))
+        self.vocab = load_vocab(vocab_file)
+        self.ids_to_tokens = collections.OrderedDict(
+            [(ids, tok) for tok, ids in self.vocab.items()])
+        self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
+
+    def tokenize(self, text):
+        split_tokens = []
+        for token in self.basic_tokenizer.tokenize(text):
+            for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                split_tokens.append(sub_token)
+        return split_tokens
+
+    def convert_tokens_to_ids(self, tokens):
+        """Converts a sequence of tokens into ids using the vocab."""
+        ids = []
+        for token in tokens:
+            ids.append(self.vocab[token])
+        return ids
+
+    def convert_ids_to_tokens(self, ids):
+        """Converts a sequence of ids in wordpiece tokens using the vocab."""
+        tokens = []
+        for i in ids:
+            tokens.append(self.ids_to_tokens[i])
+        return tokens
+
 
 
 class FullTokenizer(object):
@@ -121,9 +156,14 @@ class FullTokenizer(object):
 
   def convert_ids_to_tokens(self, ids):
     tokens = []
-    for idd in ids:
-      idx = self.vocab.values().index(idd)
-      tokens.append(self.vocab.keys()[idx])
+    if six.PY3:
+      for idd in ids:
+        idx = list(self.vocab.values())[idd]
+        tokens.append(list(self.vocab.keys())[idx])
+    elif six.PY2:
+      for idd in ids:
+        idx = self.vocab.values().index(idd)
+        tokens.append(self.vocab.keys()[idx])
     return tokens
 
 class BasicTokenizer(object):
