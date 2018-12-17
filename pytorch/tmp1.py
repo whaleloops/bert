@@ -117,16 +117,16 @@ def generate_example_given_instance(instance, tokenizer, max_seq_length,
   features["next_sentence_labels"] = [next_sentence_label]
   features['masked_lm_labels'] = np.ones_like(input_ids)*-1
   features['masked_lm_labels'][masked_lm_positions] = masked_lm_ids
+  features['masked_lm_labels'][0] = -1
 
   return features
 
 
-SENT_A = "Indeed, it was recorded in Blazing Star that a fortunate early 01 riser had once picked up on the \
-highway a solid chunk of gold quartz which the rain had freed from its incumbering soil, and washed into \
-immediate and glittering popularity."
-SENT_B =  "Possibly this may have been the reason why early risers in that locality, during the rainy \
-season, adopted a thoughtful habit of body, and seldom lifted their eyes to the rifted or \
-india-ink washed skies 01 above them."
+
+SENT_A = "Nancy has just got a 01 job as a secretary in a company. Monday was the first day she \
+went to work, so she was very excited and arrived 01 early. "
+SENT_B =  "She 01 pushed the door open and found nobody there. \"I am the 01 first to arrive.\" She \
+thought and come to her desk. She was surprised to find a bunch of 01 flowers on it. "
 IS_RANDOM_NEXT = True
 
 VOCAB_FILE = '../../uncased_L-12_H-768_A-12/vocab.txt'
@@ -241,12 +241,12 @@ for input_ids, input_mask, input_type_ids, example_indices in eval_dataloader:
     print (features['masked_lm_positions'])
     for i in range(len(input_tokens)):
         if i == features['masked_lm_positions'][mask_count]:
-            # print("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], features['masked_lm_weights'][mask_count])),
-            print("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], features['masked_lm_weights'][mask_count]),end='')
+            print("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], features['masked_lm_weights'][mask_count])),
+            # print("[%s: %s (%f)] " % (true_tokens[mask_count], pred_tokens[mask_count], features['masked_lm_weights'][mask_count]),end='')
             mask_count += 1
         else:
-            # print("%s " % (input_tokens[i])),
-            print("%s " % (input_tokens[i]),end='')
+            print("%s " % (input_tokens[i])),
+            # print("%s " % (input_tokens[i]),end='')
     print("\n")
     print("true: %d, pred: %d\n" % (features['next_sentence_labels'][0], next_sentence_predictions.detach().numpy()[0]))
     print(np.exp(next_sentence_log_probs.detach().numpy()))

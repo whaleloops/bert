@@ -1,0 +1,64 @@
+0
+{'next_sentence_accuracy': 0.8, 'masked_lm_accuracy': 0.37222222222222223, 
+'masked_lm_loss': array(4.864253, dtype=float32), 'next_sentence_loss': array(0.76956636, dtype=float32)}
+{'next_sentence_accuracy': 0.8846153846153846, 'masked_lm_accuracy': 0.40476190476190477, 
+'masked_lm_loss': array(4.762738, dtype=float32), 'next_sentence_loss': array(0.44701752, dtype=float32)}
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  global_step = 0
+INFO:tensorflow:  loss = 3.814014
+INFO:tensorflow:  masked_lm_accuracy = 0.38757813
+INFO:tensorflow:  masked_lm_loss = 3.183946
+INFO:tensorflow:  next_sentence_accuracy = 0.8375
+INFO:tensorflow:  next_sentence_loss = 0.6246173
+
+0.05
+{'next_sentence_accuracy': 0.8333333333333334, 'masked_lm_accuracy': 0.31666666666666665, 
+'masked_lm_loss': array(5.625631, dtype=float32), 'next_sentence_loss': array(0.7458373, dtype=float32)}
+{'next_sentence_accuracy': 0.8846153846153846, 'masked_lm_accuracy': 0.35714285714285715, 
+'masked_lm_loss': array(5.191292, dtype=float32), 'next_sentence_loss': array(0.5124507, dtype=float32)}
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  global_step = 0
+INFO:tensorflow:  loss = 4.5666413
+INFO:tensorflow:  masked_lm_accuracy = 0.33575317
+INFO:tensorflow:  masked_lm_loss = 3.8938842
+INFO:tensorflow:  next_sentence_accuracy = 0.85625
+INFO:tensorflow:  next_sentence_loss = 0.64009494
+
+0.1
+{'next_sentence_accuracy': 0.8666666666666667, 'masked_lm_accuracy': 0.26666666666666666, 
+'masked_lm_loss': array(6.0960774, dtype=float32), 'next_sentence_loss': array(0.4381965, dtype=float32)}
+{'next_sentence_accuracy': 0.8076923076923077, 'masked_lm_accuracy': 0.3273809523809524, 
+'masked_lm_loss': array(5.9189887, dtype=float32), 'next_sentence_loss': array(0.73294026, dtype=float32)}
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  global_step = 0
+INFO:tensorflow:  loss = 5.160204
+INFO:tensorflow:  masked_lm_accuracy = 0.29542246
+INFO:tensorflow:  masked_lm_loss = 4.591645
+INFO:tensorflow:  next_sentence_accuracy = 0.84
+INFO:tensorflow:  next_sentence_loss = 0.57183534
+
+0.2
+{'next_sentence_accuracy': 0.7333333333333333, 'masked_lm_accuracy': 0.16666666666666666, 
+'masked_lm_loss': array(7.3520427, dtype=float32), 'next_sentence_loss': array(1.1101168, dtype=float32)}
+{'next_sentence_accuracy': 0.7692307692307693, 'masked_lm_accuracy': 0.19642857142857142, 
+'masked_lm_loss': array(7.42007, dtype=float32), 'next_sentence_loss': array(1.4250442, dtype=float32)}
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  global_step = 0
+INFO:tensorflow:  loss = 7.4557323
+INFO:tensorflow:  masked_lm_accuracy = 0.18068159
+INFO:tensorflow:  masked_lm_loss = 6.1850696
+INFO:tensorflow:  next_sentence_accuracy = 0.7475
+INFO:tensorflow:  next_sentence_loss = 1.2631047
+
+0.3
+{'next_sentence_accuracy': 0.4666666666666667, 'masked_lm_accuracy': 0.07777777777777778, 
+'masked_lm_loss': array(8.577726, dtype=float32), 'next_sentence_loss': array(2.9207675, dtype=float32)}
+{'next_sentence_accuracy': 0.5, 'masked_lm_accuracy': 0.08928571428571429, 
+'masked_lm_loss': array(8.632341, dtype=float32), 'next_sentence_loss': array(2.4876022, dtype=float32)}
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  global_step = 0
+INFO:tensorflow:  loss = 10.363828
+INFO:tensorflow:  masked_lm_accuracy = 0.08328292
+INFO:tensorflow:  masked_lm_loss = 7.610555
+INFO:tensorflow:  next_sentence_accuracy = 0.47875
+INFO:tensorflow:  next_sentence_loss = 2.7410035

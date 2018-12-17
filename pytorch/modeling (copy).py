@@ -241,7 +241,7 @@ class BertSelfAttention(nn.Module):
         attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
-        attention_probs = nn.Softmax(dim=-1)(attention_scores) #TODO
+        attention_probs = nn.Softmax(dim=-1)(attention_scores)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -632,51 +632,6 @@ class BertModel(PreTrainedBertModel):
         if not output_all_encoded_layers:
             encoded_layers = encoded_layers[-1]
         return encoded_layers, pooled_output
-
-class BertWithOutEmbedding(torch.nn.Module):
-    def __init__(self, bert_model):
-        super(BertWithOutEmbedding, self).__init__()
-        self.encoder = bert_model.bert.encoder
-        self.pooler = bert_model.bert.pooler
-        self.cls = bert_model.cls
-        self.config = bert_model.config
-        # self.apply(self.init_bert_weights)
-
-    def forward(self, embedding_output, token_type_ids=None, attention_mask=None, masked_lm_labels=None, next_sentence_label=None):
-        output_all_encoded_layers = False
-
-        # We create a 3D attention mask from a 2D tensor mask.
-        # Sizes are [batch_size, 1, 1, to_seq_length]
-        # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
-        # this attention mask is more simple than the triangular masking of causal attention
-        # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-
-        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-        # masked positions, this operation will create a tensor which is 0.0 for
-        # positions we want to attend and -.0 for masked positions.
-        # Since we are adding it to the raw scores before the softmax, this is
-        # effectively the same as removing these entirely.
-        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype) # fp16 compatibility
-        extended_attention_mask = (1.0 - extended_attention_mask) * -1e30
-
-        encoded_layers = self.encoder(embedding_output,
-                                      extended_attention_mask,
-                                      output_all_encoded_layers=output_all_encoded_layers)
-        sequence_output = encoded_layers[-1]
-        pooled_output = self.pooler(sequence_output)
-        if not output_all_encoded_layers:
-            encoded_layers = encoded_layers[-1]
-        sequence_output = encoded_layers
-        prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
-
-        if masked_lm_labels is not None and next_sentence_label is not None:
-            loss_fct = CrossEntropyLoss(ignore_index=-1)
-            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), masked_lm_labels.view(-1))
-            next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
-            return masked_lm_loss, next_sentence_loss, prediction_scores, seq_relationship_score, sequence_output
-        else:
-            return prediction_scores, seq_relationship_score
 
 class BertForPreTraining(PreTrainedBertModel):
     """BERT model with pre-training heads.

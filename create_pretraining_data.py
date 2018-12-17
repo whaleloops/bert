@@ -235,8 +235,9 @@ def create_instances_from_document(
 
 
         if mask_given:
+          rng2 = random.Random(RANDOM_SEED)
           (tokens, masked_lm_positions, masked_lm_labels, segment_ids) = create_masked_lm_predictions_based_given(
-             tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, segment_ids)
+             tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, segment_ids, rng2)
         else:
           (tokens, masked_lm_positions, masked_lm_labels) = create_masked_lm_predictions(
              tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)        
@@ -288,7 +289,7 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
       masked_token = "[MASK]"
     else:
       # 10% of the time, keep original
-      if rng.random() < 0.5:
+      if rng.random() < 0.1:
         masked_token = tokens[index]
       # 10% of the time, replace with random word
       else:
@@ -316,7 +317,7 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
 
 
 def create_masked_lm_predictions_based_given(tokens, masked_lm_prob,
-                                 max_predictions_per_seq, vocab_words, segment_ids):
+                                 max_predictions_per_seq, vocab_words, segment_ids, rng2):
   """Creates the predictions for the masked LM objective."""
 
   tokens_len = len(tokens)
@@ -339,6 +340,8 @@ def create_masked_lm_predictions_based_given(tokens, masked_lm_prob,
       segment_ids_new.append(segment_ids[i])
       idx+=1
     else:
+      if rng2.random() < 0.05:
+        tok = vocab_words[rng2.randint(0, len(vocab_words) - 1)]
       output_tokens.append(tok)
       segment_ids_new.append(segment_ids[i])
       idx+=1
@@ -475,7 +478,7 @@ def main():
   features = create_multi_features_from_instances(instances, tokenizer, MAX_SEQ_LENGTH,
                                   MAX_PREDICTIONS_PER_SEQ, 'output_files')
 
-  with open('pytorch/features.pkl', 'wb') as f:
+  with open('pytorch/drop_s_test.pkl', 'wb') as f:
     pickle.dump(features, f, pickle.HIGHEST_PROTOCOL)
 
   write_instance_to_example_files(instances, tokenizer, MAX_SEQ_LENGTH,
@@ -483,10 +486,11 @@ def main():
 
 
 if __name__ == "__main__":
-  # INPUT_FILE= './test_txt.txt'
-  INPUT_FILE= './sample_text.txt'
+  # rng2.ran
+  INPUT_FILE= './test_txt.txt'
+  # INPUT_FILE= './sample_text.txt'
   VOCAB_FILE = '../uncased_L-12_H-768_A-12/vocab.txt'
-  output_files = ['../tmp/tf_examples.tfrecord']
+  output_files = ['../tmp/drop_s_test.tfrecord']
 
   RANDOM_SEED = 12345
   MAX_PREDICTIONS_PER_SEQ = 20
@@ -494,8 +498,8 @@ if __name__ == "__main__":
   DO_LOWER_CASE = True
 
   DUPE_FACTOR=5
-  SHORT_SEQ_PROB=0.1
+  SHORT_SEQ_PROB=0.01
   MASKED_LM_PROB=0.15
-  MASK_GIVEN=False
+  MASK_GIVEN=True
 
   main()

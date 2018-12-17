@@ -47,6 +47,7 @@ if __name__ == "__main__":
   BERT_CONFIG_FILE = '../../uncased_L-12_H-768_A-12/bert_config.json'
   INIT_DIRECTORY = "../../uncased_L-12_H-768_A-12"
   INIT_CHECKPOINT_PT = "../../uncased_L-12_H-768_A-12/pytorch_model.bin"
+  INPUT_FILE = "drop_0_test.pkl"
   RANDOM_SEED = 12345
   MAX_PREDICTIONS_PER_SEQ = 20
   MAX_SEQ_LENGTH = 128
@@ -63,17 +64,17 @@ if __name__ == "__main__":
   # load model
   bert_config = modeling.BertConfig(BERT_CONFIG_FILE)
   device = torch.device("cpu")
-  model = modeling.BertForPreTraining(bert_config)
-  model.load_state_dict(torch.load(INIT_CHECKPOINT_PT, map_location='cpu'))
-  # model.bert.from_pretrained(INIT_DIRECTORY)
-  model.to(device)
+  model1 = modeling.BertForPreTraining(bert_config)
+  # model2 = modeling.BertForPreTraining(bert_config)
+
+  model1.load_state_dict(torch.load(INIT_CHECKPOINT_PT, map_location='cpu'))
+  # model1.bert.from_pretrained(INIT_DIRECTORY)
+  model1.to(device)
   print ('model loaded')
 
 
-
-
   #resolve features
-  with open('features.pkl', 'rb') as f:
+  with open(INPUT_FILE, 'rb') as f:
     features = pickle.load(f)
 
   print ("%d total samples" % len(features))
@@ -93,14 +94,21 @@ if __name__ == "__main__":
     all_example_index)
   eval_sampler = SequentialSampler(eval_data)
   eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=30)
-  model.eval()
+  model1.eval()
+  
 
+  i=0
   for input_ids, input_mask, input_type_ids, masked_lm_labels, next_sentence_labels, masked_lm_ids, masked_lm_weights, masked_lm_positions, example_indices in eval_dataloader:
-    masked_lm_loss, next_sentence_loss, prediction_scores, seq_relationship_score = model(input_ids, token_type_ids=input_type_ids, attention_mask=input_mask,
-                                               masked_lm_labels=masked_lm_labels , next_sentence_label=next_sentence_labels)
+    _, _, _, _, sequence_output = model1(input_ids, token_type_ids=input_type_ids, attention_mask=input_mask,
+                                               masked_lm_labels=masked_lm_labels , next_sentence_label=next_sentence_labels, is_id=True)
+    # prediction_scores = torch.nn.functional.softmax(prediction_scores, dim=-1)
+    masked_lm_loss, next_sentence_loss, prediction_scores, seq_relationship_score, _ = model1(sequence_output, token_type_ids=input_type_ids, attention_mask=input_mask,
+                                               masked_lm_labels=masked_lm_labels , next_sentence_label=next_sentence_labels, is_id=False)
     # print (masked_lm_loss)
     # print (next_sentence_loss)
+    print prediction_scores.detach().numpy().shape
     masked_lm_log_probs =  torch.nn.functional.log_softmax(prediction_scores, dim=-1).detach().numpy()
+    np.save('prediction_scores_%02d'%i, masked_lm_log_probs)
     next_sentence_log_probs = torch.nn.functional.log_softmax(seq_relationship_score, dim=-1).detach().numpy()
     masked_lm_example_loss = masked_lm_loss.detach().numpy()
     next_sentence_example_loss = next_sentence_loss.detach().numpy()
@@ -113,5 +121,6 @@ if __name__ == "__main__":
               masked_lm_weights, masked_lm_positions, next_sentence_example_loss,
               next_sentence_log_probs, next_sentence_labels)
     print (evals)
+    i+=1
 
 
