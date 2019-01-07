@@ -275,7 +275,7 @@ def run_ADAM_transfer(embeddings, input_type_ids, input_mask, input_ids, next_se
                       style_weight=1, content_weight=1):
   # optimizer = torch.optim.Adam(model.parameters(), lr=1e-5, weight_decay=1e-4)
   # optimizer = torch.optim.Adam([model.bert.embeddings.word_embeddings.weight.requires_grad_()], lr=2e-4, weight_decay=1e-5)
-  optimizer = torch.optim.Adam([embeddings.requires_grad_()], lr=5e-3, weight_decay=1e-5)
+  optimizer = torch.optim.Adam([embeddings[0,1:,:].requires_grad_()], lr=5e-3, weight_decay=1e-5)
   # optimizer = torch.optim.LBFGS([input_ids.requires_grad_()])
   losses = np.zeros((num_steps))
   for t in range(num_steps):
@@ -335,7 +335,7 @@ def run_LBFGS_transfer(embeddings, input_type_ids, input_mask, input_ids, next_s
     print('Building the style transfer model..')
     masked_lm_loss, next_sentence_loss, masked_lm_logits_scores, seq_relationship_logits, sequence_output = model_out(embeddings, token_type_ids=input_type_ids, attention_mask=input_mask,
                                       masked_lm_labels=masked_lm_labels , next_sentence_label=next_sentence_labels)
-    optimizer = torch.optim.LBFGS([embeddings.requires_grad_()])
+    optimizer = torch.optim.LBFGS([embeddings[0,1:,:].requires_grad_()])
     print('Optimizing.. total %d steps' % num_steps)
     run = [0]
     while run[0] <= num_steps:
@@ -388,7 +388,7 @@ def run_LBFGS_transfer(embeddings, input_type_ids, input_mask, input_ids, next_s
 
     return masked_lm_logits_scores, seq_relationship_logits
 
-masked_lm_logits_scores, seq_relationship_logits = run_ADAM_transfer(embeddings, input_type_ids, input_mask, input_ids, next_sentence_labels, 
+masked_lm_logits_scores, seq_relationship_logits = run_LBFGS_transfer(embeddings, input_type_ids, input_mask, input_ids, next_sentence_labels, 
                       model_out, num_steps=61,
                       style_weight=1, content_weight=1)
 

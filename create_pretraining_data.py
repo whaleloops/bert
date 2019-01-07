@@ -126,7 +126,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   instances = []
   for _ in range(dupe_factor):
     for document_index in range(len(all_documents)):
-      tmp = create_instances_from_document(
+      tmp = create_biinstances_from_document(
               all_documents, document_index, max_seq_length, short_seq_prob,
               masked_lm_prob, max_predictions_per_seq, vocab_words, rng, mask_given=mask_given)
       instances.extend(tmp)
@@ -135,7 +135,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   return instances
 
 
-def create_instances_from_document(
+def create_biinstances_from_document(
     all_documents, document_index, max_seq_length, short_seq_prob,
     masked_lm_prob, max_predictions_per_seq, vocab_words, rng, mask_given=False):
   """Creates `TrainingInstance`s for a single document."""
@@ -478,7 +478,7 @@ def main():
   features = create_multi_features_from_instances(instances, tokenizer, MAX_SEQ_LENGTH,
                                   MAX_PREDICTIONS_PER_SEQ, 'output_files')
 
-  with open('pytorch/drop_s_test.pkl', 'wb') as f:
+  with open('pytorch/clinic_train.pkl', 'wb') as f:
     pickle.dump(features, f, pickle.HIGHEST_PROTOCOL)
 
   write_instance_to_example_files(instances, tokenizer, MAX_SEQ_LENGTH,
@@ -487,10 +487,10 @@ def main():
 
 if __name__ == "__main__":
   # rng2.ran
-  INPUT_FILE= './test_txt.txt'
+  INPUT_FILE= './clinic_train.txt'
   # INPUT_FILE= './sample_text.txt'
-  VOCAB_FILE = '../uncased_L-12_H-768_A-12/vocab.txt'
-  output_files = ['../tmp/drop_s_test.tfrecord']
+  VOCAB_FILE = '../uncased_L-12_H-768_A-12/vocab6.txt'
+  output_files = ['../tmp/clinic_train3.tfrecord']
 
   RANDOM_SEED = 12345
   MAX_PREDICTIONS_PER_SEQ = 20
@@ -498,8 +498,8 @@ if __name__ == "__main__":
   DO_LOWER_CASE = True
 
   DUPE_FACTOR=5
-  SHORT_SEQ_PROB=0.01
+  SHORT_SEQ_PROB=0.1
   MASKED_LM_PROB=0.15
-  MASK_GIVEN=True
+  MASK_GIVEN=False
 
   main()

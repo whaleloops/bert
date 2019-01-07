@@ -175,6 +175,8 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
         init_string = ", *INIT_FROM_CKPT*"
       tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                       init_string)
+    logging_hook = tf.train.LoggingTensorHook({"masked_lm_loss" : masked_lm_loss, 
+        "next_sentence_loss" : next_sentence_loss}, every_n_iter=1)
 
     output_spec = None
     if mode == tf.estimator.ModeKeys.TRAIN:
@@ -185,7 +187,8 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
           mode=mode,
           loss=total_loss,
           train_op=train_op,
-          scaffold_fn=scaffold_fn)
+          scaffold_fn=scaffold_fn,
+          training_hooks = [logging_hook])
     elif mode == tf.estimator.ModeKeys.EVAL:
 
       def metric_fn(masked_lm_example_loss, masked_lm_log_probs, masked_lm_ids,
@@ -605,7 +608,7 @@ def main(_):
         is_training=False)
 
     result = estimator.evaluate(
-        input_fn=eval_input_fn, steps=100)
+        input_fn=eval_input_fn, steps=FLAGS.max_eval_steps)
 
     output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
     with tf.gfile.GFile(output_eval_file, "w") as writer:
